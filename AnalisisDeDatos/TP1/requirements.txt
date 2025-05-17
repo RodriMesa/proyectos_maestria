@@ -1,0 +1,8 @@
+pandas
+duckdb
+pyarrow
+polars
+seaborn
+networkx
+folium
+scikit-learn
