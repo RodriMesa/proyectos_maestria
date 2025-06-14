@@ -29,9 +29,10 @@ def generate_parquet():
     print(df_final.describe())
     print(df_final.info())
 
+    print(sum(df_final["cantidad_recorridos"]))
+
     # Guardar el DataFrame final en formato Parquet
-    df_final.to_parquet("final.parquet", index=False)
-    print(df_final.head())
+    df_final.to_parquet("final.parquet", index=True)
 
 
 if __name__ == "__main__":

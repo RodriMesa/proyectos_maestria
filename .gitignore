@@ -173,8 +173,6 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-*.csv
-
 *.duckdb
 
 /AnalisisDeDatos/TP1/observaciones_2024/*
