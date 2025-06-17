@@ -5,3 +5,5 @@ statsmodels
 xgboost
 pyarrow
 scikit-learn
+seaborn
+optuna
