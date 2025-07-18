@@ -1,0 +1,11 @@
+FROM python:3.10
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --upgrade pip \
+ && pip install -r requirements.txt \
+ && pip install griffe==0.36.9
+
+COPY flows /app/flows
+CMD ["python", "flows/emnist_pipeline.py"]

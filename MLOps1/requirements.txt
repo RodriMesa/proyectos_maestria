@@ -1,0 +1,7 @@
+prefect[dev]==2.14.12
+mlflow
+boto3
+pandas
+numpy
+scikit-learn
+matplotlib
