@@ -28,8 +28,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_PASS}
     ports:
-      - "${MINIO_STORAGE_PORT}:9000"  # S3 API
-      - "${MINIO_UI_PORT}:9001"  # Web UI
+      - "${MINIO_STORAGE_PORT}:9000" # S3 API
+      - "${MINIO_UI_PORT}:9001" # Web UI
     volumes:
       - ./minio_data:/data
     healthcheck:
@@ -50,7 +50,7 @@ services:
       MINIO_ENDPOINT: http://minio:${MINIO_STORAGE_PORT}
       MINIO_ACCESS_KEY: ${MINIO_USER}
       MINIO_SECRET_KEY: ${MINIO_PASS}
-    entrypoint: [ "bash", "/scripts/bootstrap.sh" ]
+    entrypoint: ["bash", "/scripts/bootstrap.sh"]
 
   mlflow:
     build:

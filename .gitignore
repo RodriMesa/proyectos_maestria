@@ -175,3 +175,4 @@ cython_debug/
 *.duckdb
 
 /AnalisisDeDatos/TP1/observaciones_2024/*
+.DS_Store
