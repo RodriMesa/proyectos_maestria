@@ -4,6 +4,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score
 import mlflow
+from mlflow.tracking import MlflowClient
 import boto3
 import os
 import tempfile
@@ -84,7 +85,7 @@ def emnist_pipeline():
         X_train = data["X_train"]
         y_train = data["y_train"]
 
-        model = RandomForestClassifier(n_estimators=100, random_state=42)
+        model = RandomForestClassifier(n_estimators=100)
         model.fit(X_train, y_train)
 
         # Serializar modelo
@@ -122,20 +123,86 @@ def emnist_pipeline():
     def log_to_mlflow(results_dict: dict):
         s3 = get_s3_client()
 
-        # Descargar modelo
-        model_response = s3.get_object(Bucket="mlflow", Key=results_dict["model_key"])
-        model_bytes = model_response['Body'].read()
-        model = pickle.loads(model_bytes)
-        acc = results_dict["accuracy"]
-        report = results_dict["report"]
+        try:
+            # Descargar modelo
+            model_response = s3.get_object(Bucket="mlflow", Key=results_dict["model_key"])
+            model_bytes = model_response['Body'].read()
+            model = pickle.loads(model_bytes)
+            acc = results_dict["accuracy"]
+            report = results_dict["report"]
 
-        with mlflow.start_run():
-            mlflow.log_metric("accuracy", acc)
-            for label, scores in report.items():
-                if isinstance(scores, dict):
-                    for metric_name, value in scores.items():
-                        mlflow.log_metric(f"{label}_{metric_name}", value)
-            mlflow.sklearn.log_model(model, "model")
+            with mlflow.start_run() as run:
+                mlflow_run_id = run.info.run_id
+                mlflow.log_metric("accuracy", acc)
+                # Loguear métricas globales del classification_report
+                if "macro avg" in report:
+                    for metric_name, value in report["macro avg"].items():
+                        mlflow.log_metric(f"macro_avg_{metric_name}", value)
+
+                if "weighted avg" in report:
+                    for metric_name, value in report["weighted avg"].items():
+                        mlflow.log_metric(f"weighted_avg_{metric_name}", value)
+                
+                # A veces 'accuracy' también está como clave en report
+                if "accuracy" in report and isinstance(report["accuracy"], (int, float)):
+                    mlflow.log_metric("report_accuracy", report["accuracy"])
+
+                mlflow.sklearn.log_model(model, "model")
+            mlflow.end_run(status="FINISHED")
+            return mlflow_run_id
+        except Exception as e:
+            mlflow.end_run(status="FAILED")
+            raise
+
+    @task
+    def promote_best_model(mlflow_run_id: str, registered_model_name: str = "EMNIST-Model"):
+        client = MlflowClient()
+
+        existing_models = [m.name for m in client.search_registered_models()]
+        if registered_model_name not in existing_models:
+            client.create_registered_model(registered_model_name)
+
+        # Registrar la nueva versión del modelo en Model Registry de MLFlow
+        model_version = client.create_model_version(
+            name=registered_model_name,
+            source=f"runs:/{mlflow_run_id}/model",
+            run_id=mlflow_run_id
+        )
+
+        # Obtener todas las versiones del modelo
+        versions = client.search_model_versions(f"name='{registered_model_name}'")
+
+        # Buscar mejor versión por accuracy (u otra métrica)
+        best_version = None
+        best_acc = -float("inf")
+
+        # Buscar la mejor versión por accuracy
+        for v in versions:
+            run_data = client.get_run(v.run_id).data
+            acc_v = run_data.metrics.get("accuracy", 0)
+            if acc_v > best_acc:
+                best_acc = acc_v
+                best_version = v
+
+        # Promocionar la mejor versión y archivar las demás
+        if best_version:
+            for v in versions:
+                if v.version == best_version.version:
+                    # Poner tag stage = Production
+                    client.set_model_version_tag(
+                        name=registered_model_name,
+                        version=v.version,
+                        key="stage",
+                        value="Production"
+                    )
+                else:
+                    # Poner tag stage = Archived
+                    client.set_model_version_tag(
+                        name=registered_model_name,
+                        version=v.version,
+                        key="stage",
+                        value="Archived"
+                    )
 
     paths_dict = download_csvs()
 
@@ -145,6 +212,8 @@ def emnist_pipeline():
 
     results_dict = evaluate_model(model_key, data_key)
 
-    log_to_mlflow(results_dict)
+    mlflow_run_id = log_to_mlflow(results_dict)
+
+    promote_best_model(mlflow_run_id)
 
 dag = emnist_pipeline()

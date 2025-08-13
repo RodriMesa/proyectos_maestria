@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>EMNIST Draw & Predict</title>
+<style>
+  #canvas {
+    border: 1px solid black;
+    touch-action: none;
+  }
+  #prediction {
+    font-size: 24px;
+    margin-top: 10px;
+  }
+  button {
+    margin-top: 10px;
+    padding: 8px 16px;
+    font-size: 16px;
+  }
+</style>
+</head>
+<body>
+  <h1>Dibuja un caracter</h1>
+  <canvas id="canvas" width="280" height="280"></canvas><br />
+  <button id="clear-btn">Limpiar</button>
+  <div id="prediction">Predicción: -</div>
+
+<script src="/static/main.js"></script>
+</body>
+</html>

@@ -87,6 +87,7 @@ services:
       interval: 60s
       timeout: 10s
       retries: 3
+      start_period: 3s
 
   airflow-init:
     build:
@@ -104,7 +105,7 @@ services:
       MLFLOW_S3_ENDPOINT_URL: http://minio:${MINIO_STORAGE_PORT}
       AWS_ACCESS_KEY_ID: ${MINIO_USER}
       AWS_SECRET_ACCESS_KEY: ${MINIO_PASS}
-      MLFLOW_TRACKING_URI: http://localhost:${MLFLOW_PORT}
+      MLFLOW_TRACKING_URI: http://mlflow:${MLFLOW_PORT}
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
@@ -132,7 +133,7 @@ services:
       MLFLOW_S3_ENDPOINT_URL: http://minio:${MINIO_STORAGE_PORT}
       AWS_ACCESS_KEY_ID: ${MINIO_USER}
       AWS_SECRET_ACCESS_KEY: ${MINIO_PASS}
-      MLFLOW_TRACKING_URI: http://localhost:${MLFLOW_PORT}
+      MLFLOW_TRACKING_URI: http://mlflow:${MLFLOW_PORT}
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
@@ -157,10 +158,51 @@ services:
       MLFLOW_S3_ENDPOINT_URL: http://minio:${MINIO_STORAGE_PORT}
       AWS_ACCESS_KEY_ID: ${MINIO_USER}
       AWS_SECRET_ACCESS_KEY: ${MINIO_PASS}
-      MLFLOW_TRACKING_URI: http://localhost:${MLFLOW_PORT}
+      MLFLOW_TRACKING_URI: http://mlflow:${MLFLOW_PORT}
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
       - /etc/localtime:/etc/localtime:ro
     command: scheduler
+
+  mlflow_serve_model:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/Dockerfile.mlflow_serve_model
+    container_name: mlflow_serve_model
+    restart: always
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:${MLFLOW_PORT}
+      AWS_ACCESS_KEY_ID: ${MINIO_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_PASS}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:${MINIO_STORAGE_PORT}
+      AWS_REGION: us-east-1
+      REGISTERED_MODEL_NAME: EMNIST-Model
+      MLFLOW_SERVE_MODEL_PORT: ${MLFLOW_SERVE_MODEL_PORT}
+    depends_on:
+      mlflow:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports:
+      - "${MLFLOW_SERVE_MODEL_PORT}:1234"
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://mlflow_serve_model:${MLFLOW_SERVE_MODEL_PORT} || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    
+  draw_app:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/Dockerfile.draw_app
+    container_name: draw_app
+    ports:
+      - "${DRAW_APP_PORT}:8000"
+    depends_on:
+      mlflow_serve_model:
+        condition: service_healthy
+    environment:
+      MODEL_URL: http://mlflow_serve_model:${MLFLOW_SERVE_MODEL_PORT}/invocations
