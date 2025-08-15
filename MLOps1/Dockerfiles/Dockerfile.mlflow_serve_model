@@ -3,8 +3,10 @@ FROM python:3.12-slim
 # Evitar buffering para logs en consola
 ENV PYTHONUNBUFFERED=1
 
+RUN apt-get update && apt-get install -y wget
+
 # Instalar mlflow y boto3 para S3/MinIO
-RUN pip install --no-cache-dir mlflow boto3 wget
+RUN pip install --no-cache-dir mlflow boto3
 
 # El mejor modelo es siempre el marcado en el stage "Production"
 COPY ./scripts/serve_model.py /app/serve_model.py

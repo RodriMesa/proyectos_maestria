@@ -35,6 +35,7 @@ with open(mapping_file, "r") as f:
 async def get(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+
 # Endpoint que recibe la imagen del canvas (base64)
 @app.post("/predict")
 async def predict(data: dict):
@@ -42,7 +43,7 @@ async def predict(data: dict):
         # Extraemos base64
         img_data = data.get("image")
         header, base64_data = img_data.split(",", 1)
-        
+
         # Decodificamos la imagen
         img_bytes = base64.b64decode(base64_data)
         img = Image.open(io.BytesIO(img_bytes)).convert("L")  # escala grises
@@ -50,14 +51,12 @@ async def predict(data: dict):
         # Procesamos para modelo EMNIST: resize 28x28, invertimos blanco-negro
         img = img.resize((28, 28))
         img_np = np.array(img)
-        img_np = 255 - img_np  # invertir colores: fondo negro, trazo blanco
-        img_np = img_np / 255.0  # normalizar
+        # img_np = 255 - img_np  # invertir colores: fondo negro, trazo blanco
+        # img_np = img_np / 255.0  # normalizar
 
         # Convertimos a lista para enviar JSON
         input_data = img_np.flatten().tolist()
-        payload = {
-            "instances": [input_data]  # Lista de instancias, cada una es un array
-        }
+        payload = {"instances": [input_data]}  # Lista de instancias, cada una es un array
 
         # Enviamos al modelo expuesto (suponiendo API REST que espera JSON { "input": [...] })
         response = requests.post(MODEL_URL, json=payload)
@@ -74,6 +73,7 @@ async def predict(data: dict):
 
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
