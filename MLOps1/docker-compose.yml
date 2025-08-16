@@ -39,19 +39,6 @@ services:
       retries: 3
       start_period: 3s
 
-  data-loader:
-    image: debian:bullseye
-    container_name: data-loader
-    depends_on:
-      minio:
-        condition: service_healthy
-    volumes:
-      - ./scripts:/scripts
-    environment:
-      MINIO_ENDPOINT: http://minio:${MINIO_STORAGE_PORT}
-      MINIO_ACCESS_KEY: ${MINIO_USER}
-      MINIO_SECRET_KEY: ${MINIO_PASS}
-    entrypoint: ["bash", "/scripts/bootstrap.sh"]
 
   mlflow:
     build:
@@ -73,7 +60,7 @@ services:
       minio:
         condition: service_started
       data-loader:
-        condition: service_completed_successfully
+        condition: service_started
     ports:
       - "${MLFLOW_PORT}:5000"
     command: >
@@ -87,7 +74,7 @@ services:
       interval: 60s
       timeout: 10s
       retries: 3
-      start_period: 3s
+      start_period: 30s
 
   airflow-init:
     build:
@@ -96,11 +83,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      data-loader:
-        condition: service_completed_successfully
+      #data-loader:
+      #  condition: service_completed_successfully
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POST_USER}:${POST_PASS}@postgres:5432/${POST_DB_AIRFLOW}
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
       TZ: America/Argentina/Buenos_Aires
       MLFLOW_S3_ENDPOINT_URL: http://minio:${MINIO_STORAGE_PORT}
       AWS_ACCESS_KEY_ID: ${MINIO_USER}
@@ -129,11 +117,13 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POST_USER}:${POST_PASS}@postgres:5432/${POST_DB_AIRFLOW}
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
       TZ: America/Argentina/Buenos_Aires
       MLFLOW_S3_ENDPOINT_URL: http://minio:${MINIO_STORAGE_PORT}
       AWS_ACCESS_KEY_ID: ${MINIO_USER}
       AWS_SECRET_ACCESS_KEY: ${MINIO_PASS}
       MLFLOW_TRACKING_URI: http://mlflow:5000
+
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
@@ -159,12 +149,37 @@ services:
       AWS_ACCESS_KEY_ID: ${MINIO_USER}
       AWS_SECRET_ACCESS_KEY: ${MINIO_PASS}
       MLFLOW_TRACKING_URI: http://mlflow:5000
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
       - /etc/localtime:/etc/localtime:ro
     command: scheduler
+
+  data-loader:
+      image: debian:bullseye
+      container_name: data-loader
+      depends_on:
+        minio:
+          condition: service_healthy
+        airflow-webserver:
+          condition: service_started
+        airflow-scheduler:
+          condition: service_started
+      volumes:
+        - ./scripts:/scripts
+      environment:
+        MINIO_ENDPOINT: http://minio:${MINIO_STORAGE_PORT}
+        MINIO_ACCESS_KEY: ${MINIO_USER}
+        MINIO_SECRET_KEY: ${MINIO_PASS}
+        AIRFLOW_API: http://airflow-webserver:8080/api/v1
+        AIRFLOW_USER: ${AIRFLOW_USER}
+        AIRFLOW_PASS: ${AIRFLOW_PASS}
+        DAG_ID: emnist_airflow_pipeline
+
+      entrypoint: ["bash", "/scripts/bootstrap.sh"]
+
 
   mlflow_serve_model:
     build:
@@ -185,6 +200,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      data-loader:
+        condition: service_completed_successfully
     ports:
       - "${MLFLOW_SERVE_MODEL_PORT}:1234"
     healthcheck:

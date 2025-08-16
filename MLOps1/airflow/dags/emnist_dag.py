@@ -12,8 +12,8 @@ import pickle
 
 S3_BUCKET = "mlflow"
 S3_PREFIX = "emnist/"
-TRAIN_FILE = "emnist-balanced-train.csv"
-TEST_FILE = "emnist-balanced-test.csv"
+TRAIN_FILE = "emnist-digits-train.csv"
+TEST_FILE = "emnist-digits-test.csv"
 
 mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000"))
 
@@ -33,6 +33,7 @@ def get_s3_client():
     start_date=days_ago(1),
     catchup=False,
     tags=["emnist"],
+    is_paused_upon_creation=False,
 )
 def emnist_pipeline():
 

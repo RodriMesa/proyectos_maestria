@@ -51,6 +51,8 @@ async def predict(data: dict):
         # Procesamos para modelo EMNIST: resize 28x28, invertimos blanco-negro
         img = img.resize((28, 28))
         img_np = np.array(img)
+        threshold = 128
+        img_np = np.where(img_np > threshold, 255, 0).astype(np.uint8)
         # img_np = 255 - img_np  # invertir colores: fondo negro, trazo blanco
         # img_np = img_np / 255.0  # normalizar
 
