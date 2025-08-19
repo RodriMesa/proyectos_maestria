@@ -44,6 +44,20 @@ else
 fi
 # --- FIN BLOQUE DE DATOS ---
 
+# -----------------------------
+# Verificar si ya hay modelo en Production usando tag "stage"
+# -----------------------------
+MODEL_EXISTS=$(curl -s "${MLFLOW_API}/api/2.0/mlflow/registered-models/get-latest-versions?name=${MODEL_NAME}" \
+  | jq -r '(.latest_versions // []) | .[0].name // empty')
+
+if [[ -n "$MODEL_EXISTS" ]]; then
+  echo "El modelo '${MODEL_NAME}' ya existe en MLflow. Saltando despliegue."
+  exit 0
+fi
+
+# -----------------------------
+# Si no lo hay, correr automáticamente el DAG
+# -----------------------------
 echo "Esperando que Airflow esté disponible (webserver:8080/health)..."
 until curl -s -o /dev/null -w "%{http_code}" http://airflow-webserver:8080/health | grep -q 200; do
   echo "Aún no disponible, reintentando en 5s..."

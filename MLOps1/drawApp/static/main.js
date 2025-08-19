@@ -8,7 +8,7 @@ let lastX = 0;
 let lastY = 0;
 
 // Configuración inicial
-ctx.lineWidth = 15;
+ctx.lineWidth = 20;
 ctx.lineCap = "round";
 ctx.strokeStyle = "white";
 ctx.fillStyle = "black";
