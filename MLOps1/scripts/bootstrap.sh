@@ -47,10 +47,10 @@ fi
 # -----------------------------
 # Verificar si ya hay modelo en Production usando tag "stage"
 # -----------------------------
-MODEL_EXISTS=$(curl -s "${MLFLOW_API}/api/2.0/mlflow/registered-models/get-latest-versions?name=${MODEL_NAME}" \
-  | jq -r '(.latest_versions // []) | .[0].name // empty')
+MODEL_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" \
+  "${MLFLOW_API}/api/2.0/mlflow/registered-models/get?name=${MODEL_NAME}")
 
-if [[ -n "$MODEL_EXISTS" ]]; then
+if [[ "$MODEL_EXISTS" == "200" ]]; then
   echo "El modelo '${MODEL_NAME}' ya existe en MLflow. Saltando despliegue."
   exit 0
 fi
