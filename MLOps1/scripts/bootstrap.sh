@@ -1,15 +1,15 @@
 #!/bin/bash
 set -e
 
-# Instala mc, curl, unzip y wget
+# Install mc, curl, unzip & wget
 apt-get update && apt-get install -y curl unzip wget jq ca-certificates && \
   curl -sLO https://dl.min.io/client/mc/release/linux-amd64/mc && \
   chmod +x mc && mv mc /usr/local/bin/
 
-# Configura alias
+# Configure alias
 mc alias set local ${MINIO_ENDPOINT} ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY}
 
-# --- BLOQUE DE DATOS (se ejecuta solo si faltan archivos) ---
+# --- DATA BLOCK (skip when no files are missing) ---
 NEED_DATA=0
 if ! mc stat local/mlflow/emnist/emnist-digits-train.csv >/dev/null 2>&1; then
   NEED_DATA=1
@@ -21,31 +21,31 @@ fi
 if [ "$NEED_DATA" -eq 1 ]; then
   echo "Faltan archivos. Preparando datos EMNIST..."
 
-  # Crea el bucket si no existe (no falla si ya existe)
+  # Create bucket  if not existing
   mc mb local/mlflow || echo "El bucket ya existe"
 
-  # Carpeta temporal
+  # Temporal folder to download dataset
   mkdir -p /tmp/emnist && cd /tmp/emnist
 
-  # Descarga desde Kaggle
+  # Download datasets from Kaggle
   curl --progress-bar -L -o emnist.zip https://www.kaggle.com/api/v1/datasets/download/crawford/emnist
 
-  # Descomprime
+  # Unzip
   unzip -o emnist.zip || echo "Error descomprimiendo archivo"
 
-  # Sube al bucket (sólo si existen localmente)
+  # Upload datasets to bucket (if available)
   [ -f emnist-digits-train.csv ] && mc cp emnist-digits-train.csv local/mlflow/emnist/
   [ -f emnist-digits-test.csv ] && mc cp emnist-digits-test.csv  local/mlflow/emnist/
 
-  # Limpieza
+  # Clean temporal folders
   rm -rf /tmp/emnist
 else
   echo "Los archivos ya existen en el bucket. Saltando descarga/subida."
 fi
-# --- FIN BLOQUE DE DATOS ---
+# --- END DATA BLOCK ---
 
 # -----------------------------
-# Verificar si ya hay modelo en Production usando tag "stage"
+# Check for a 'Production' model in MLFlow Model Registry using the 'stage' tag
 # -----------------------------
 MODEL_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" \
   "${MLFLOW_API}/api/2.0/mlflow/registered-models/get?name=${MODEL_NAME}")
@@ -56,7 +56,7 @@ if [[ "$MODEL_EXISTS" == "200" ]]; then
 fi
 
 # -----------------------------
-# Si no lo hay, correr automáticamente el DAG
+# If no model is created or detected on 'Production', automatically run DAG
 # -----------------------------
 echo "Esperando que Airflow esté disponible (webserver:8080/health)..."
 until curl -s -o /dev/null -w "%{http_code}" http://airflow-webserver:8080/health | grep -q 200; do
@@ -66,7 +66,7 @@ done
 
 echo "Airflow está listo. Disparando DAG ${DAG_ID}..."
 
-# OJO: usamos AIRFLOW_API (que ya apunta a :8080/api/v1)
+# CAUTION: use AIRFLOW_API (it points to :8080/api/v1)
 RUN_ID=$(
   curl -s -u "${AIRFLOW_USER}:${AIRFLOW_PASS}" \
     -H "Content-Type: application/json" \

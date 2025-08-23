@@ -1,3 +1,4 @@
+# Entrypoint to serve a model from MLFlow Model Registry
 from mlflow.tracking import MlflowClient
 import subprocess
 import os
@@ -6,10 +7,10 @@ client = MlflowClient()
 registered_model_name = os.getenv("REGISTERED_MODEL_NAME", "EMNIST-Model")
 port = os.getenv("MLFLOW_SERVE_MODEL_PORT", 1234)
 
-# Obtener todas las versiones del modelo
+# Obtain all versions of EMNIST-Model model
 versions = client.search_model_versions(f"name='{registered_model_name}'")
 
-# Filtrar por tag stage=Production
+# Filter by tag stage=Production
 production_versions = []
 for v in versions:
     mv = client.get_model_version(registered_model_name, v.version)
@@ -19,7 +20,7 @@ for v in versions:
 if not production_versions:
     raise Exception("No hay versiones en producción")
 
-# Servir modelo en producción
+# Serve model in production stage
 prod_version = max(production_versions, key=lambda x: int(x.version))
 model_uri = f"models:/{registered_model_name}/{prod_version.version}"
 

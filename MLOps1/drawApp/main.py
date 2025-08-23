@@ -24,11 +24,13 @@ templates = Jinja2Templates(directory="templates")
 mapping_file = "mapping.txt"
 idx_to_char = {}
 
+# Decodificar la clase que detecta el modelo al caracter original detectado
 with open(mapping_file, "r") as f:
     for line in f:
         idx, code = line.strip().split()
         idx_to_char[int(idx)] = chr(int(code))  # convertimos Unicode a carácter
 
+# Proprocesar la imagen leída del canvas para asemejarse a las imágenes de entrenamiento del modelo
 def transform_image_to_emnist_format(img_data):
     # 1) Decodificar base64 → PIL (L)
     header, base64_data = img_data.split(",", 1)
@@ -90,13 +92,16 @@ def transform_image_to_emnist_format(img_data):
 async def get(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-# Endpoint que recibe la imagen del canvas (base64)
+# Endpoint que recibe la imagen del canvas (base64), la procesa con el modelo y devuelve la predicción
 @app.post("/predict")
 async def predict(data: dict):
     try:
         img_data = data.get("image")
+
+        # Preprocesar la imagen
         payload, preview = transform_image_to_emnist_format(img_data=img_data)
 
+        # Llamar al endpoint del modelo para clasificación
         response = requests.post(MODEL_URL, json=payload)
         if response.status_code == 200:
             pred = response.json().get("predictions")[0]
@@ -109,7 +114,6 @@ async def predict(data: dict):
         return JSONResponse({"prediction": pred_char, "preview": preview})
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

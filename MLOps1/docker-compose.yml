@@ -80,8 +80,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      #data-loader:
-      #  condition: service_completed_successfully
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POST_USER}:${POST_PASS}@postgres:5432/${POST_DB_AIRFLOW}
@@ -180,7 +178,6 @@ services:
         DAG_ID: emnist_airflow_pipeline
 
       entrypoint: ["bash", "/scripts/bootstrap.sh"]
-
 
   mlflow_serve_model:
     build:
