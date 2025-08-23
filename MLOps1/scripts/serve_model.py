@@ -26,10 +26,4 @@ model_uri = f"models:/{registered_model_name}/{prod_version.version}"
 
 print(f"Sirviendo modelo {model_uri}")
 
-subprocess.run([
-    "mlflow", "models", "serve",
-    "-m", model_uri,
-    "-p", port,
-    "--host", "0.0.0.0",
-    "--no-conda"
-])
+subprocess.run(["mlflow", "models", "serve", "-m", model_uri, "-p", port, "--host", "0.0.0.0", "--no-conda"])

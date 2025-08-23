@@ -21,10 +21,7 @@ ctx.fillRect(0, 0, canvas.width, canvas.height);
 function getCoords(e) {
   if (e.touches && e.touches.length) {
     const rect = canvas.getBoundingClientRect();
-    return [
-      e.touches[0].clientX - rect.left,
-      e.touches[0].clientY - rect.top,
-    ];
+    return [e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top];
   }
   return [e.offsetX, e.offsetY];
 }

@@ -17,6 +17,7 @@ TEST_FILE = "emnist-digits-test.csv"
 
 mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000"))
 
+
 def get_s3_client():
     """
     Quick access to s3 bucket.
@@ -28,7 +29,7 @@ def get_s3_client():
         aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
     )
 
-# Create DAG structure. Execute the pipeline manually
+
 @dag(
     dag_id="emnist_airflow_pipeline",
     schedule_interval=None,
@@ -50,7 +51,7 @@ def emnist_pipeline():
         s3.download_file(S3_BUCKET, S3_PREFIX + TRAIN_FILE, train_path)
         s3.download_file(S3_BUCKET, S3_PREFIX + TEST_FILE, test_path)
 
-        # XComs prevent passing the files to the next block, so we store the info on 
+        # XComs prevent passing the files to the next block, so we store the info on
         # s3 and pass the path to the next task.
         return {"train_path": train_path, "test_path": test_path}
 
@@ -234,6 +235,7 @@ def emnist_pipeline():
     results_dict = evaluate_model(model_key, data_key)
     mlflow_run_id = log_to_mlflow(results_dict)
     promote_best_model(mlflow_run_id)
+
 
 # Expose this pipeline in Airflow
 dag = emnist_pipeline()

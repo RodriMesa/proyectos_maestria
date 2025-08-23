@@ -30,6 +30,7 @@ with open(mapping_file, "r") as f:
         idx, code = line.strip().split()
         idx_to_char[int(idx)] = chr(int(code))  # convertimos Unicode a carácter
 
+
 # Proprocesar la imagen leída del canvas para asemejarse a las imágenes de entrenamiento del modelo
 def transform_image_to_emnist_format(img_data):
     # 1) Decodificar base64 → PIL (L)
@@ -43,7 +44,7 @@ def transform_image_to_emnist_format(img_data):
 
     # 3) Asegurar colores: fondo negro (0), trazo blanco (255)
     #    Si las esquinas son claras, invertimos.
-    if np.mean([img_np[0,0], img_np[0,-1], img_np[-1,0], img_np[-1,-1]]) > 127:
+    if np.mean([img_np[0, 0], img_np[0, -1], img_np[-1, 0], img_np[-1, -1]]) > 127:
         img_np = 255 - img_np
 
     # 4) Binarizar (umbral simple robusto)
@@ -57,16 +58,16 @@ def transform_image_to_emnist_format(img_data):
     else:
         x0, x1 = xs.min(), xs.max()
         y0, y1 = ys.min(), ys.max()
-        crop = img_np[y0:y1+1, x0:x1+1]
+        crop = img_np[y0 : y1 + 1, x0 : x1 + 1]
 
         h, w = crop.shape
         scale = 20 / max(h, w)
-        new_w, new_h = max(1, int(round(w*scale))), max(1, int(round(h*scale)))
+        new_w, new_h = max(1, int(round(w * scale))), max(1, int(round(h * scale)))
         crop = Image.fromarray(crop).resize((new_w, new_h), Image.BILINEAR)
 
         canvas = np.zeros((28, 28), dtype=np.uint8)
-        y_off, x_off = (28 - new_h)//2, (28 - new_w)//2
-        canvas[y_off:y_off+new_h, x_off:x_off+new_w] = np.array(crop)
+        y_off, x_off = (28 - new_h) // 2, (28 - new_w) // 2
+        canvas[y_off : y_off + new_h, x_off : x_off + new_w] = np.array(crop)
 
     # 6) Convención EMNIST: rotar -90° y espejo horizontal
     canvas = np.fliplr(np.rot90(canvas, 3))
@@ -78,7 +79,7 @@ def transform_image_to_emnist_format(img_data):
     inputs = [canvas.flatten().tolist()]
 
     # ---- Crear preview (dataURL) 28x28 escalado a 280px “pixelado” ----
-    im28 = Image.fromarray(canvas)              # 28x28
+    im28 = Image.fromarray(canvas)  # 28x28
     im_big = im28.resize((280, 280), Image.NEAREST)
     buf = io.BytesIO()
     im_big.save(buf, format="PNG")
@@ -87,10 +88,12 @@ def transform_image_to_emnist_format(img_data):
 
     return {"inputs": inputs}, preview_dataurl
 
+
 # Página principal con el canvas
 @app.get("/", response_class=HTMLResponse)
 async def get(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
 
 # Endpoint que recibe la imagen del canvas (base64), la procesa con el modelo y devuelve la predicción
 @app.post("/predict")
@@ -114,6 +117,7 @@ async def predict(data: dict):
         return JSONResponse({"prediction": pred_char, "preview": preview})
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
