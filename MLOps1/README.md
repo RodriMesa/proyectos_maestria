@@ -75,14 +75,17 @@ Se deberían ver los siguientes servicios activos: postgres, minio, mlflow, airf
 5. Acceder a las interfaces web (puertos en `.env`)
 
 - MinIO: [http://localhost:{MINIO_UI_PORT}](http://localhost:{MINIO_UI_PORT}). En la página debería verse un bucket "mlflow" con los directorios que se pueden observar en la imagen:
+
 ![Minio](./images/Minio.png)
 
 - Airflow: [http://localhost:{AIRFLOW_WEB_PORT}](http://localhost:{AIRFLOW_WEB_PORT}). Debería observarse un DAG "emnist_airflow_pipeline" con por lo menos una ejecución exitosa ya lanzada. Su diagrama de bloques es como el que se muestra en la imagen:
+
 ![Airflow](./images/Airflow.png)
 
 - MLflow: [http://localhost:{MLFLOW_PORT}](http://localhost:{MLFLOW_PORT}). Debería existir una versión del modelo "EMNIST-Model" con el tag `stage=Production`. *Nota: el nombre del tag es uno generado propio, no el stage que proveía MLFlow y ya está deprecado*.
 
-- Draw App: [http://localhost:{DRAW_APP_PORT}](http://localhost:{DRAW_APP_PORT}). En la ventana deberían verse dos lienzos: en el de la izquierda se puede dibujar y se hace una llamada al modelo de reconocimiento de dígitos una vez por segundo; en el de la derecha se ve el resultado de preprocesar la imagen del lienzo para asemejarla lo máximo posible al conjunto de entrenamiento (se aplica un filtro Gaussiano para suavizar los bordes y operaciones de rotación, y escala). El botón "Limpiar" resetea el canvas.
+- Draw App: [http://localhost:{DRAW_APP_PORT}](http://localhost:{DRAW_APP_PORT}). En la ventana deberían verse dos lienzos: en el de la izquierda se puede dibujar y se hace una llamada al modelo de reconocimiento de dígitos una vez por segundo; en el de la derecha se ve el resultado de preprocesar la imagen del lienzo para asemejarla lo máximo posible al conjunto de entrenamiento (se aplica un filtro Gaussiano para suavizar los bordes y operaciones de rotación y escala). El botón "Limpiar" resetea el canvas.
+
 ![DrawApp](./images/Draw_App.gif)
 
 ## Requisitos
