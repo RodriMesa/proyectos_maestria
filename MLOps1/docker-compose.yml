@@ -214,6 +214,7 @@ services:
       context: .
       dockerfile: ./Dockerfiles/Dockerfile.draw_app
     container_name: draw_app
+    restart: always
     ports:
       - "${DRAW_APP_PORT}:8000"
     depends_on:
