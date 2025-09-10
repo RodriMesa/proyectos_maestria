@@ -1,2 +1,7 @@
 optuna
 scikit-learn
+tensorflow
+gensim
+seaborn
+plotly
+nbformat
