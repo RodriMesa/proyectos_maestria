@@ -5,3 +5,6 @@ gensim
 seaborn
 plotly
 nbformat
+keras
+beautifulsoup4
+lxml
