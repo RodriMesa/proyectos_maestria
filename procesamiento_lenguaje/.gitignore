@@ -1,3 +1,8 @@
 songs_dataset/
 *.tsv
 *.zip
+*logs
+spa-eng
+*.pt
+*.pkl
+*.json
