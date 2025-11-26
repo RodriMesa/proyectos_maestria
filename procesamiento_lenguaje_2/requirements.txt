@@ -3,3 +3,6 @@ torchvision
 httpx
 matplotlib
 tqdm
+pinecone
+python-dotenv
+pypdf
