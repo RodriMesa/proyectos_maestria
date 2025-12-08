@@ -12,7 +12,8 @@ En el segundo archivo se genera el RAG, el cual utiliza los embeddings de Pineco
 
 Para el tp3, se generó un archivo: TP3_web.py, en donde se define la estructura del agente que realiza las tareas solicitadas en la consigna, como también la pequeña app de streamlit que muestra los resultados y permite interactuar con el agente. Para una mejor explicación, se grabó un video donde se presentan los resultados, y se explican las principales elecciones de diseño.
 **Link al Video:** https://drive.google.com/file/d/1ob2dP60B1fSQofQmOt7n7wcgtKzOMG8-/view?usp=sharing
-
+Se agregó además un pequeño video donde se muestra el caso donde no se especifica la persona: 
+**Link**: https://drive.google.com/file/d/14esc1x02oDtlkiICyR0JLgfxwZjrYYNK/view?usp=sharing
 Como puntos principales de la elección de diseño, se optó por utilizar un agente con dos usos de LLM:
 - Parser y estructuración de contenido: se encargar de analizar la solicitud del usuario, formateando cada una de las consultas del texto en una entrada de json. Esto permite obtener una respuesta estructurada, donde por ejemplo si se consulta: "En que universidad estudió Rodrigo Mesa, y donde trabaja Juan García?" La respuesta sería: [{"persona":"rodrigo-mesa", "motivo":"Universidad"}, {"persona":"juan-garcia", "motivo":"Trabajo"}], lo cual procesamos como json y convertimos en un diccionario. 
 - Agente de respuesta: en base a la consulta del usuario, y al contexto obtenido desde la base de datos vectorial (Pinecone), el agente da la respuesta.
