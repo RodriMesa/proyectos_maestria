@@ -389,6 +389,8 @@ if "retrieved_context" not in st.session_state:
     st.session_state.retrieved_context = []
 if "agent_trace" not in st.session_state:
     st.session_state.agent_trace = {}
+if "graph_png" not in st.session_state:
+    st.session_state.graph_png = None
 
 if st.sidebar.button("🗑️ Limpiar conversación"):
     st.session_state.conversation_history = []
@@ -412,6 +414,23 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
+
+
+# ========================================
+# DIAGRAMA DEL GRAFO
+# ========================================
+with st.expander("📈 Diagrama del grafo del agente"):
+    existing_png = st.session_state.get("graph_png")
+    if isinstance(existing_png, (bytes, bytearray)):
+        st.image(existing_png, caption="Grafo del agente (LangGraph)")
+    render_clicked = st.button("Generar / refrescar diagrama", key="render_graph_btn")
+    if render_clicked or existing_png is None:
+        try:
+            graph_png = agent.graph.get_graph().draw_png()
+            st.session_state.graph_png = graph_png
+            st.image(graph_png, caption="Grafo del agente (LangGraph)")
+        except Exception as exc:
+            st.error(f"No se pudo renderizar el grafo: {exc}")
 
 
 # ========================================
