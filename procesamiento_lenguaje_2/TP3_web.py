@@ -51,13 +51,13 @@ ANSWER_SYSTEM_PROMPT = (
     "Respondé unicamente lo que te consulten, no des información que no se te preguntó."
 )
 PARSER_PROMPT = (
-    "Sos un agente encargado de identificar dos aspectos en las solicitudes de usuario: el nombre de la persona del "
-    "que se solicita información, y lo que se desea encontrar de la persona. Esto es para identificar secciones del CV "
-    "que se están consultando. Por ejemplo: si tengo la frase 'Quiero ver la experiencia y la educacion de Rodrigo Mesa', "
-    'me tenes que responder {"motivo": "Quiero ver la experiencia y la educacion de Rodrigo Mesa","persona":"rodrigo-mesa"}. '
-    "Siempre tu respuesta debe estar en formato JSON, con las claves motivo y persona. Las unicas personas validas son: "
-    "'rodrigo-mesa', 'danilo-reitano' y 'juan-garcia'. Si no se aclara una persona, tomar como opción por defecto "
-    "'rodrigo-mesa'. No completar con ningún texto adicional, tu unica respuesta valida es el JSON indicado."
+    "Eres un agente que identifica para cada solicitud las personas mencionadas y el motivo/consulta sobre su CV. "
+    "Debes responder EXCLUSIVAMENTE con un JSON que sea una lista de objetos, uno por persona. Cada objeto debe tener "
+    'las claves \"persona\" y \"motivo\". Ejemplo de salida: '
+    '[{\"motivo\": \"Experiencia y Educacion\", \"persona\": \"rodrigo-mesa\"}]. '
+    "Si el usuario menciona varias personas, incluye un objeto por cada una, reutilizando el mismo motivo si no se especifica. "
+    "Personas válidas: 'rodrigo-mesa', 'danilo-reitano', 'juan-garcia'. Si no se aclara persona, usa 'rodrigo-mesa' por defecto. "
+    "No escribas texto adicional; solo devuelve el JSON solicitado."
 )
 
 # ========================================
@@ -111,11 +111,11 @@ def get_chat_model(model_name: str, api_key: str):
 # ========================================
 class AgentState(TypedDict):
     messages: Annotated[List[AnyMessage], operator.add]
-    parsed_query: Optional[Dict[str, Any]]
+    parsed_queries: Optional[List[Dict[str, Any]]]
     context: Optional[str]
-    selected_persona: Optional[str]
+    selected_personas: Optional[List[str]]
     retrieved_chunks: Optional[List[Dict[str, Any]]]
-    retrieval_debug: Optional[Dict[str, Any]]
+    retrieval_debug: Optional[List[Dict[str, Any]]]
 
 
 class Agent:
@@ -163,12 +163,25 @@ class Agent:
     def call_groq_parser(self, state: AgentState):
         messages = [SystemMessage(content=self.parser_prompt)] + state["messages"]
         message = self.model.invoke(messages)
-        parsed = self._safe_extract_json(message.content)
-        if parsed.get("persona") not in self.index_by_person:
-            parsed["persona"] = self.default_persona
-        if "motivo" not in parsed:
-            parsed["motivo"] = ""
-        return {"messages": [message], "parsed_query": parsed}
+        parsed_raw = self._safe_extract_json(message.content)
+        parsed_list = []
+        if isinstance(parsed_raw, dict):
+            parsed_list = [parsed_raw]
+        elif isinstance(parsed_raw, list):
+            parsed_list = [p for p in parsed_raw if isinstance(p, dict)]
+
+        normalized = []
+        for item in parsed_list:
+            persona = item.get("persona") or self.default_persona
+            if persona not in self.index_by_person:
+                persona = self.default_persona
+            motivo = item.get("motivo") or ""
+            normalized.append({"persona": persona, "motivo": motivo})
+
+        if not normalized:
+            normalized = [{"persona": self.default_persona, "motivo": ""}]
+
+        return {"messages": [message], "parsed_queries": normalized}
 
     def call_groq_general(self, state: AgentState):
         human_messages = [msg for msg in state["messages"] if isinstance(msg, HumanMessage)]
@@ -182,22 +195,36 @@ class Agent:
         return {"messages": [message]}
 
     def take_action(self, state: AgentState):
-        parsed = state.get("parsed_query") or {}
-        persona = parsed.get("persona") or self.default_persona
-        if persona not in self.index_by_person:
-            persona = self.default_persona
+        parsed_list = state.get("parsed_queries") or []
+        if not parsed_list:
+            parsed_list = [{"persona": self.default_persona, "motivo": ""}]
 
         user_messages = [msg for msg in state["messages"] if isinstance(msg, HumanMessage)]
-        query_text = parsed.get("motivo") or (user_messages[-1].content if user_messages else "")
+        fallback_query = user_messages[-1].content if user_messages else ""
 
-        contexts, retrieval_debug = self._retrieve_context(persona, query_text)
-        context_prompt = self._format_context_for_prompt(persona, contexts)
+        contexts_all: List[Dict[str, Any]] = []
+        debug_all: List[Dict[str, Any]] = []
+        personas_used: List[str] = []
+
+        for item in parsed_list:
+            persona = item.get("persona") or self.default_persona
+            if persona not in self.index_by_person:
+                persona = self.default_persona
+            personas_used.append(persona)
+
+            query_text = item.get("motivo") or fallback_query
+            contexts, retrieval_debug = self._retrieve_context(persona, query_text)
+            retrieval_debug["parsed_motivo"] = item.get("motivo") or ""
+            contexts_all.extend(contexts)
+            debug_all.append(retrieval_debug)
+
+        context_prompt = self._format_context_for_prompt(contexts_all)
 
         return {
             "context": context_prompt,
-            "selected_persona": persona,
-            "retrieved_chunks": contexts,
-            "retrieval_debug": retrieval_debug,
+            "selected_personas": personas_used,
+            "retrieved_chunks": contexts_all,
+            "retrieval_debug": debug_all,
         }
 
     def _safe_extract_json(self, content: str) -> Dict[str, Any]:
@@ -280,18 +307,19 @@ class Agent:
             debug["error"] = str(exc)
             return [], debug
 
-    def _format_context_for_prompt(self, persona: str, contexts):
+    def _format_context_for_prompt(self, contexts: List[Dict[str, Any]]):
         if not contexts:
-            return f"Contexto recuperado desde Pinecone para {persona}: no se encontraron coincidencias relevantes."
+            return "Contexto recuperado desde Pinecone: no se encontraron coincidencias relevantes."
 
         blocks = []
         for ctx in contexts:
             score_txt = ""
             if isinstance(ctx.get("score"), (int, float)):
                 score_txt = f" (score: {ctx['score']:.3f})"
-            blocks.append(f"{ctx.get('section')}{score_txt}\n{ctx.get('content')}")
+            persona = ctx.get("persona", "persona-desconocida")
+            blocks.append(f"{persona} | {ctx.get('section')}{score_txt}\n{ctx.get('content')}")
 
-        return f"Usa exclusivamente el siguiente contexto del CV de {persona}:\n" + "\n\n".join(blocks)
+        return "Usa exclusivamente el siguiente contexto recuperado desde Pinecone:\n" + "\n\n".join(blocks)
 
 
 # ========================================
@@ -397,11 +425,11 @@ def generate_agent_response(user_text: str):
         return f"Error al generar respuesta: {exc}"
 
     contexts = result.get("retrieved_chunks") or []
-    parsed_query = result.get("parsed_query") or {}
-    persona = result.get("selected_persona") or parsed_query.get("persona") or DEFAULT_PERSONA
+    parsed_queries = result.get("parsed_queries") or []
+    selected_personas = result.get("selected_personas") or [DEFAULT_PERSONA]
     context_prompt = result.get("context")
     agent_messages = result.get("messages") or []
-    retrieval_debug = result.get("retrieval_debug") or {}
+    retrieval_debug = result.get("retrieval_debug") or []
 
     response_text = next(
         (getattr(msg, "content", "") for msg in reversed(agent_messages) if getattr(msg, "content", "")),
@@ -410,8 +438,8 @@ def generate_agent_response(user_text: str):
 
     st.session_state.retrieved_context = contexts
     st.session_state.agent_trace = {
-        "parsed_query": parsed_query,
-        "selected_persona": persona,
+        "parsed_queries": parsed_queries,
+        "selected_personas": selected_personas,
         "context_prompt": context_prompt,
         "messages": [
             {
@@ -474,16 +502,24 @@ if user_input and (user_input.strip() or send_button):
     if st.session_state.agent_trace:
         with st.expander("🧠 Trazas del agente (debug)"):
             trace = st.session_state.agent_trace
-            st.markdown(f"**Persona seleccionada:** {trace.get('selected_persona')}")
+            personas_txt = ", ".join(trace.get("selected_personas") or [])
+            st.markdown(f"**Personas seleccionadas:** {personas_txt or 'N/D'}")
             st.markdown("**Consulta interpretada (parser):**")
-            st.json(trace.get("parsed_query") or {})
+            st.json(trace.get("parsed_queries") or [])
             st.markdown("**Contexto enviado al LLM:**")
             st.code(trace.get("context_prompt") or "Sin contexto", language="markdown")
             st.markdown("**Mensajes de la corrida:**")
             st.json(trace.get("messages") or [])
             st.markdown("**Diagnóstico de Pinecone:**")
-            st.json(trace.get("retrieval_debug") or {})
-            raw_matches = (trace.get("retrieval_debug") or {}).get("raw_matches") or []
+            retrieval_dbg = trace.get("retrieval_debug") or []
+            st.json(retrieval_dbg)
+            raw_matches = []
+            for dbg in retrieval_dbg:
+                rm = dbg.get("raw_matches")
+                if isinstance(rm, list):
+                    raw_matches.extend(rm)
+                elif rm:
+                    raw_matches.append(rm)
             if raw_matches:
                 st.markdown("**Raw matches (Pinecone):**")
                 st.json(raw_matches)
