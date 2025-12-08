@@ -3,7 +3,7 @@ TP3 Web - Chat RAG con agente LangGraph + Pinecone + Groq
 ========================================================
 
 Esta app reutiliza la interfaz de TP2, pero reemplaza la lógica de generación
-por el agente construido en el notebook `Agentes_Langchain.ipynb`.
+por el agente base del notebook `Agentes_Langchain.ipynb`.
 El agente:
 - Parsea la consulta para detectar persona y motivo.
 - Recupera contexto del CV correspondiente en Pinecone.
@@ -15,10 +15,6 @@ Ejecutar con:
 Variables de entorno necesarias:
     GROQ_API_KEY
     PINECONE_API_KEY
-Opcional (si los índices tienen nombres distintos):
-    PINECONE_INDEX_RODRIGO
-    PINECONE_INDEX_DANILO
-    PINECONE_INDEX_JUAN
 """
 
 import json
